@@ -94,7 +94,6 @@ public class Day09 extends BaseDay {
                 }
 
                 final var basin = new Basin(x, y, currentVal);
-
                 traverse(basin, grid, x, y, null);
 
                 basins.add(basin);
@@ -102,16 +101,78 @@ public class Day09 extends BaseDay {
         }
 
         final var top3 = basins.stream()
-            .map(it -> it.getSize())
-            .sorted()
+            .sorted((basin1, basin2) -> {
+                if (basin1.getSize() < basin2.getSize()) {
+                    return 1;
+                } else if (basin1.getSize() > basin2.getSize()){
+                    return -1;
+                }
+                return 0;
+            })
             .collect(Collectors.toList());
 
-        final var factor = top3.get(basins.size() -1) * top3.get(basins.size() -2) * top3.get(basins.size() -3);
-        log.info(String.format("%d x %d x %d", top3.get(basins.size() -1), top3.get(basins.size() -2), top3.get(basins.size() -3)));
+        printAllBasins(grid, basins);
+//        printGrid(grid, top3.get(0));
+//        printGrid(grid, top3.get(1));
+//        printGrid(grid, top3.get(2));
+
+        final var factor =
+            top3.get(0).getSize() * top3.get(1).getSize() * top3.get(2).getSize();
+
+        log.info(String.format("%d x %d x %d",
+            top3.get(0).getSize(), top3.get(1).getSize(), top3.get(2).getSize()));
 
         log.info("TOTAL: " + factor);
 
         //2175255
+    }
+
+    private void printAllBasins(Grid grid, List<Basin> basins) {
+        int count = 0;
+        var lineStr = "\n";
+        for (int x = 0; x < grid.getMaxY(); x++) {
+            for (int y = 0; y < grid.getMaxY(); y++) {
+                int basinCount = 0;
+                for (var basin : basins) {
+                    if (basin.exists(x, y)) {
+                        basinCount ++;
+                    }
+                }
+
+                if (basinCount == 1) {
+                    lineStr += grid.getValue(x, y);
+                } else if (basinCount > 1) {
+                    throw new RuntimeException("Overlap on" + x + ", " + y);
+                } else {
+                    lineStr += "X";
+                }
+
+            }
+            lineStr += "\n";
+        }
+
+        log.info(lineStr);
+        log.info("COUNT: " + count);
+    }
+
+    private void printGrid(Grid grid, Basin basin) {
+        int count = 0;
+        var lineStr = "\n";
+        for (int x = 0; x < grid.getMaxY(); x++) {
+            for (int y = 0; y < grid.getMaxY(); y++) {
+                if (basin.exists(x, y)) {
+                    lineStr += grid.getValue(x, y);
+                    count++;
+                } else {
+                    lineStr += "X";
+                }
+                lineStr += " ";
+            }
+            lineStr += "\n";
+        }
+
+        log.info(lineStr);
+        log.info("COUNT: " + count);
     }
 
     private void traverse(Basin basin, Grid grid, int x, int y, Direction direction) {
@@ -126,8 +187,8 @@ public class Day09 extends BaseDay {
     }
 
     private void traverseLeft(Basin basin, Grid grid, int x, int y) {
-        if (grid.getValue(x + 1, y) + 1 == grid.getValue(x, y)) {
-            if (basin.addCoord(x, y)) {
+        if (grid.getValue(x + 1, y) < grid.getValue(x, y)) {
+            if (basin.addCoord(x, y, grid.getValue(x, y))) {
                 return;
             }
             traverse(basin, grid, x, y, Direction.LEFT);
@@ -135,8 +196,8 @@ public class Day09 extends BaseDay {
     }
 
     private void traverseRight(Basin basin, Grid grid, int x, int y) {
-        if (grid.getValue(x - 1, y) + 1 == grid.getValue(x, y)) {
-            if (basin.addCoord(x, y)) {
+        if (grid.getValue(x - 1, y) < grid.getValue(x, y)) {
+            if (basin.addCoord(x, y, grid.getValue(x, y))) {
                 return;
             }
             traverse(basin, grid, x, y, Direction.RIGHT);
@@ -144,8 +205,8 @@ public class Day09 extends BaseDay {
     }
 
     private void traverseUp(Basin basin, Grid grid, int x, int y) {
-        if (grid.getValue(x, y + 1) + 1 == grid.getValue(x, y)) {
-            if (basin.addCoord(x, y)) {
+        if (grid.getValue(x, y + 1) < grid.getValue(x, y)) {
+            if (basin.addCoord(x, y, grid.getValue(x, y))) {
                 return;
             }
             traverse(basin, grid, x, y, Direction.UP);
@@ -153,8 +214,8 @@ public class Day09 extends BaseDay {
     }
 
     private void traverseDown(Basin basin, Grid grid, int x, int y) {
-        if (grid.getValue(x, y - 1) + 1 == grid.getValue(x, y)) {
-            if (basin.addCoord(x, y)) {
+        if (grid.getValue(x, y - 1) < grid.getValue(x, y)) {
+            if (basin.addCoord(x, y, grid.getValue(x, y))) {
                 return;
             }
             traverse(basin, grid, x, y, Direction.DOWN);
@@ -196,20 +257,25 @@ public class Day09 extends BaseDay {
             size++;
         }
 
-        public boolean addCoord(int x, int y) {
+        public boolean addCoord(int x, int y, int val) {
+            if (val == 9) {
+                return true;
+            }
+
             var row = basin.get(y);
 
             if (row == null) {
                 basin.put(y, new ArrayList<Integer>(List.of(x)));
                 size++;
+                return false;
             } else if (!row.contains(x)) {
                 row.add(x);
                 basin.put(y, row);
                 size++;
-            } else {
-                return true;
+                return false;
             }
-            return false;
+            // coordinate already exists
+            return true;
         }
 
         public int getSize() {
@@ -218,6 +284,13 @@ public class Day09 extends BaseDay {
 //            basin.values()
 //                .forEach(fullList::addAll);
 //            return fullList.size();
+        }
+
+        public boolean exists(int x, int y) {
+            if (basin.get(y) != null) {
+                return basin.get(y).contains(x);
+            }
+            return false;
         }
     }
 
