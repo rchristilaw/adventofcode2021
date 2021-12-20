@@ -1,8 +1,7 @@
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URISyntaxException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -31,31 +30,33 @@ public class Day14 extends BaseDay {
 
 
         for (int i = 0; i < 10; i++) {
-            var tempArray =  template.split("");
+            var tempArray = template.split("");
             var newStr = new StringBuilder();
-            for(int j = 0; j < tempArray.length - 1; j++) {
+            for (int j = 0; j < tempArray.length - 1; j++) {
                 newStr.append(template.charAt(j));
-                final var currentPattern = template.substring(j, j+2);
+                final var currentPattern = template.substring(j, j + 2);
                 if (insertMap.containsKey(currentPattern)) {
                     newStr.append(insertMap.get(currentPattern));
                 }
             }
             newStr.append(tempArray[tempArray.length - 1]);
-            log.info("TOTAL: " + newStr.length());
+//            log.info("TOTAL: " + newStr.length());
             template = newStr.toString();
 
         }
 
-        var resultArray =  template.split("");
+        var resultArray = template.split("");
 
         final var letterMap = new HashMap<String, Integer>();
-        for(var letter : resultArray) {
+        for (var letter : resultArray) {
             letterMap.put(letter, letterMap.get(letter) == null ? 1 : letterMap.get(letter) + 1);
         }
 
         for (var l : letterMap.keySet()) {
             log.info("Letter: " + l + " Count: " + letterMap.get(l));
         }
+
+        log.info("?????????????????????????");
     }
 
     public void runPart2() throws URISyntaxException, IOException {
@@ -70,29 +71,67 @@ public class Day14 extends BaseDay {
                 insertMap.put(val[0], val[1]);
             });
 
-        var tempLL = new LinkedList<>(Arrays.asList(template.split("")));
-        for (int i = 0; i < 40; i++) {
-            var newLL = new LinkedList<String>();
-            for(int j = 0; j < tempLL.size() - 1; j++) {
-                newLL.add(tempLL.get(j));
-                final var currentPattern = tempLL.get(j) + tempLL.get(j+1);
-                if (insertMap.containsKey(currentPattern)) {
-                    newLL.add(insertMap.get(currentPattern));
-                }
-            }
-            newLL.add(tempLL.getLast());
+//        var templateArr = template.split("");
+//
+//        final var groups = new ArrayList<String>();
+//        for (int i = 0; i < templateArr.length - 1; i++) {
+//            groups.add(templateArr[i] + templateArr[i + 1]);
+//        }
+//
+//
+//        final var letterMap = new HashMap<String, Integer>();
+//        addCountToMap(letterMap, template);
+//
+//        for (var group : groups) {
+//            int step = 1;
+//            recurse(step, template, insertMap, letterMap);
+//        }
 
-            tempLL = new LinkedList<>(newLL);
-            log.info("Current Level: " + i);
-        }
-
-        final var letterMap = new HashMap<String, Integer>();
-        for(var letter : tempLL) {
-            letterMap.put(letter, letterMap.get(letter) == null ? 1 : letterMap.get(letter) + 1);
-        }
+        final var letterMap = new HashMap<String, BigDecimal>();
+        addCountToMap(letterMap, template);
+        recurse(1, template, insertMap, letterMap);
 
         for (var l : letterMap.keySet()) {
             log.info("Letter: " + l + " Count: " + letterMap.get(l));
+        }
+    }
+
+    private void recurse(int step, String template, Map<String, String> insertMap, Map<String, BigDecimal> letterMap) {
+        if (step > 4) {
+            return;
+        }
+        log.info("STEP: " + step);
+        final var groups = new ArrayList<String>();
+        for (int i = 0; i < template.length() - 1; i++) {
+            groups.add(template.substring(i, i + 2));
+        }
+
+        for (var group : groups) {
+            for (int i = 0; i < 10; i++) {
+                var newStr = new StringBuilder();
+                for (int j = 0; j < group.length() - 1; j++) {
+                    newStr.append(group.charAt(j));
+                    final var currentPattern = group.substring(j, j + 2);
+                    if (insertMap.containsKey(currentPattern)) {
+                        newStr.append(insertMap.get(currentPattern));
+                        addCountToMap(letterMap, insertMap.get(currentPattern));
+                    }
+                }
+                newStr.append(group.charAt(group.length() - 1));
+                group = newStr.toString();
+            }
+
+            recurse(step + 1, group, insertMap, letterMap);
+        }
+
+    }
+
+
+    private void addCountToMap(Map<String, BigDecimal> letterMap, String result) {
+        var resultArray = result.split("");
+        for (var letter : resultArray) {
+            letterMap.put(letter, letterMap.get(letter) == null
+                ? BigDecimal.ONE : letterMap.get(letter).add(BigDecimal.ONE));
         }
     }
 }
