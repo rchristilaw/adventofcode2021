@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -33,14 +34,11 @@ public class Day19 extends BaseDay {
         }
         scanners.add(currentScanner);
 
-        int match = 0;
-
-        var foundScanners = new HashMap<String, Match>();
         scanners.get(0).coord = new Coord(0, 0,0);
         scanners.get(0).rotation = 0;
 
-        for (int b = 0; b < 5; b ++) {
-            for (int s = 1; s < 5; s++) {
+        for (int b = 0; b < scanners.size(); b ++) {
+            for (int s = 0; s < scanners.size(); s++) {
                 if (b == s) {
                     continue;
                 }
@@ -68,28 +66,42 @@ public class Day19 extends BaseDay {
 
                     var name = found.scanner;
                     var balanced = false;
-                    var rotScanner = found.relativeTo;
-                    var currentRotation = found.rotation;
-                    var prevRotation = found.rotation;
+                    var relativeScanner = found.relativeTo;
+                    int currentRotation = 0;
                     Coord newCoord = found.coord;
+
                     while(!balanced) {
-                        final var currScan = rotScanner;
+                        final var currScan = relativeScanner;
                         final var relScan = scanners.stream()
                             .filter(it -> it.name == currScan)
                             .findFirst().orElseThrow();
                         currentRotation = relScan.rotation;
 
                         if (currentRotation != 0) {
-                            newCoord = combineCoord(translateRotation(newCoord, currentRotation), relScan.coord);
-                            rotScanner = relScan.relativeTo;
-                            prevRotation = relScan.rotation;
+                            newCoord = combineCoord(translateRotation(newCoord, currentRotation), relScan.foundCoord);
+                            relativeScanner = relScan.relativeTo;
+
+                            var newBeacons = new ArrayList<Coord>();
+                            for(var beacon : scanner.copyBeacons) {
+                                newBeacons.add(new Coord(translateRotation(beacon, currentRotation), relScan.foundCoord));
+                            }
+                            scanner.copyBeacons = newBeacons;
                         } else {
                             balanced = true;
                         }
                     }
+
                     scanner.coord = newCoord;
-                    scanner.relativeTo = 0;
-                    scanner.rotation = prevRotation;
+                    scanner.foundCoord = found.coord;
+                    scanner.relativeTo = found.relativeTo;
+                    scanner.rotation = found.rotation;
+
+//                    var newBeacons = new ArrayList<Coord>();
+//                    for(var beacon : scanner.copyBeacons) {
+//                        newBeacons.add(combineCoord(beacon, newCoord));
+//                    }
+//                    scanner.copyBeacons = newBeacons;
+
                 }
             }
         }
@@ -98,9 +110,28 @@ public class Day19 extends BaseDay {
             log.info(String.format("Scanner %d: %d, %d, %d", sc.name, sc.coord.x, sc.coord.y, sc.coord.z));
         }
         var total = 0;
-        log.info("TOTAL: " + match);
+        findAllBeacons(scanners);
+//        log.info("TOTAL: " + match);
     }
 
+    private void findAllBeacons(List<Scanner> scanners) {
+        final var map = new HashSet<String>();
+        for (var scanner : scanners) {
+            for (var beacon : scanner.copyBeacons) {
+                var newVal = new Coord(translateRotation(beacon, scanner.rotation), scanner.coord);
+                map.add(newVal.key);
+            }
+        }
+
+        var str = "";
+        for (var beacon : map) {
+            str += beacon + "\n";
+        }
+        log.info("Beacons:\n" + str);
+
+        var total = 0;
+        log.info("TOTAL: " + map.size());
+    }
     private Coord combineCoord(Coord c1, Coord c2) {
         return new Coord(c2.x - c1.x, c2.y - c1.y, c2.z - c1.z);
     }
@@ -112,7 +143,7 @@ public class Day19 extends BaseDay {
     }
 
     private Match findScannerCoord(Scanner scanner, Scanner baseScanner) {
-        final var totalOrientations = scanner.beacons.get(0).size();
+        final var totalOrientations = 48;
         final var targetBeacons = baseScanner.getBeaconsWithRotation(0);
 
         for (int r = 0; r < totalOrientations; r++) {
@@ -132,6 +163,13 @@ public class Day19 extends BaseDay {
                             match.coord = newCoord;
                             match.rotation = r;
                             match.relativeTo = baseScanner.name;
+
+                            var newBeacons = new ArrayList<Coord>();
+                            for (var beacon : currentBeacons) {
+                                newBeacons.add(
+                                    new Coord(beacon, newCoord));
+                            }
+                            scanner.copyBeacons = newBeacons;
                             return match;
                         }
                     } else {
@@ -153,17 +191,19 @@ public class Day19 extends BaseDay {
     private static class Scanner {
         private int name;
         private Coord coord;
+        private Coord foundCoord;
         private int rotation;
         private int relativeTo;
-        private List<List<Coord>> beacons = new ArrayList<>();
+        private List<Coord> beacons = new ArrayList<>();
+        private List<Coord> copyBeacons = new ArrayList<>();
 
         private void addBeacons(Coord coord) {
-            beacons.add(getPermutations(coord));
+            beacons.add(coord);
         }
 
         private List<Coord> getBeaconsWithRotation(int i) {
             return beacons.stream()
-                .map(it -> it.get(i))
+                .map(it -> getPermutations(it).get(i))
                 .collect(Collectors.toList());
         }
     }
@@ -179,12 +219,16 @@ public class Day19 extends BaseDay {
             this.x = Integer.parseInt(split[0]);
             this.y = Integer.parseInt(split[1]);
             this.z = Integer.parseInt(split[2]);
+
+            key = this.x + "," + this.y + "," + this.z;
         }
 
         Coord(int x, int y, int z) {
             this.x = x;
             this.y = y;
             this.z = z;
+
+            key = this.x + "," + this.y + "," + this.z;
         }
 
         Coord(Coord c1, Coord c2) {
