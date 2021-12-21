@@ -1,9 +1,6 @@
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -35,151 +32,90 @@ public class Day19 extends BaseDay {
         scanners.add(currentScanner);
 
         scanners.get(0).coord = new Coord(0, 0,0);
-        scanners.get(0).rotation = 0;
 
-        for (int b = 0; b < scanners.size(); b ++) {
-            for (int s = 0; s < scanners.size(); s++) {
-                if (b == s) {
+        var allMapped = false;
+        while (!allMapped) {
+            for (int i = 1; i < scanners.size(); i++) {
+                if (scanners.get(i).coord != null) {
                     continue;
                 }
 
-                var baseScanner = scanners.get(b);
-                if (baseScanner.coord == null) {
-                    continue;
-                }
-
-
-                log.info("Scanner: " + s);
-                final var scanner = scanners.get(s);
-                if (scanner.coord != null) {
-                    continue;
-                }
-
-                var found = findScannerCoord(scanner, baseScanner);
-
-                if (found != null) {
-
-                    var r = findByName(found.relativeTo, scanners);
-                    if (r == null || r.coord == null) {
-                        continue;
-                    }
-
-                    var name = found.scanner;
-                    var balanced = false;
-                    var relativeScanner = found.relativeTo;
-                    int currentRotation = 0;
-                    Coord newCoord = found.coord;
-
-                    while(!balanced) {
-                        final var currScan = relativeScanner;
-                        final var relScan = scanners.stream()
-                            .filter(it -> it.name == currScan)
-                            .findFirst().orElseThrow();
-                        currentRotation = relScan.rotation;
-
-                        if (currentRotation != 0) {
-                            newCoord = combineCoord(translateRotation(newCoord, currentRotation), relScan.foundCoord);
-                            relativeScanner = relScan.relativeTo;
-
-                            var newBeacons = new ArrayList<Coord>();
-                            for(var beacon : scanner.copyBeacons) {
-                                newBeacons.add(new Coord(translateRotation(beacon, currentRotation), relScan.foundCoord));
-                            }
-                            scanner.copyBeacons = newBeacons;
-                        } else {
-                            balanced = true;
-                        }
-                    }
-
-                    scanner.coord = newCoord;
-                    scanner.foundCoord = found.coord;
-                    scanner.relativeTo = found.relativeTo;
-                    scanner.rotation = found.rotation;
-
-//                    var newBeacons = new ArrayList<Coord>();
-//                    for(var beacon : scanner.copyBeacons) {
-//                        newBeacons.add(combineCoord(beacon, newCoord));
-//                    }
-//                    scanner.copyBeacons = newBeacons;
-
-                }
+                scanners.get(i).coord = detectBeacons(scanners.get(i), scanners.get(0));
             }
+            allMapped = scanners.stream()
+                .noneMatch(it -> it.coord == null);
         }
 
         for (var sc : scanners) {
             log.info(String.format("Scanner %d: %d, %d, %d", sc.name, sc.coord.x, sc.coord.y, sc.coord.z));
         }
-        var total = 0;
-        findAllBeacons(scanners);
-//        log.info("TOTAL: " + match);
-    }
 
-    private void findAllBeacons(List<Scanner> scanners) {
-        final var map = new HashSet<String>();
-        for (var scanner : scanners) {
-            for (var beacon : scanner.copyBeacons) {
-                var newVal = new Coord(translateRotation(beacon, scanner.rotation), scanner.coord);
-                map.add(newVal.key);
+        var totalBeacons = scanners.get(0).beacons.stream()
+            .map(it -> it.key)
+            .collect(Collectors.toSet());
+
+        log.info("TOTAL: " + totalBeacons.size());
+
+        var maxDistance = 0;
+
+        for (int i = 0; i < scanners.size(); i++) {
+            for (int j = 0; j < scanners.size(); j++) {
+                var scanner1 = scanners.get(i).coord;
+                var scanner2 = scanners.get(j).coord;
+
+                var distance = Math.abs(scanner1.x - scanner2.x) + Math.abs(scanner1.y - scanner2.y) + Math.abs(scanner1.z - scanner2.z);
+
+                maxDistance = Math.max(distance, maxDistance);
             }
         }
 
-        var str = "";
-        for (var beacon : map) {
-            str += beacon + "\n";
-        }
-        log.info("Beacons:\n" + str);
-
-        var total = 0;
-        log.info("TOTAL: " + map.size());
-    }
-    private Coord combineCoord(Coord c1, Coord c2) {
-        return new Coord(c2.x - c1.x, c2.y - c1.y, c2.z - c1.z);
+        log.info("Max Distance: " + maxDistance);
     }
 
-    private Scanner findByName(int name, List<Scanner> scanners) {
-        return scanners.stream()
-            .filter(it -> it.name == name)
-            .findFirst().orElse(null);
-    }
-
-    private Match findScannerCoord(Scanner scanner, Scanner baseScanner) {
-        final var totalOrientations = 48;
+    private Coord detectBeacons(Scanner scanner, Scanner baseScanner) {
         final var targetBeacons = baseScanner.getBeaconsWithRotation(0);
 
-        for (int r = 0; r < totalOrientations; r++) {
+        for (int r = 0; r < 48; r++) {
             var matchers = new HashMap<String, Integer>();
             for (int t = 0; t < targetBeacons.size(); t++) {
                 final var currentBeacons = scanner.getBeaconsWithRotation(r);
                 for (int b = 0; b < currentBeacons.size(); b++) {
                     final var current = currentBeacons.get(b);
                     final var currentTarget = targetBeacons.get(t);
-                    final var newCoord = new Coord(current, currentTarget);
+                    final var newCoord = combineCoord(current, currentTarget);
+
                     if (matchers.containsKey(newCoord.key)) {
                         final var count = matchers.get(newCoord.key);
                         matchers.put(newCoord.key, count +  1);
-                        if (count == 11) {
-                            var match = new Match();
-                            match.scanner = scanner.name;
-                            match.coord = newCoord;
-                            match.rotation = r;
-                            match.relativeTo = baseScanner.name;
-
-                            var newBeacons = new ArrayList<Coord>();
-                            for (var beacon : currentBeacons) {
-                                newBeacons.add(
-                                    new Coord(beacon, newCoord));
-                            }
-                            scanner.copyBeacons = newBeacons;
-                            return match;
-                        }
                     } else {
                         matchers.put(newCoord.key, 1);
                     }
                 }
             }
+
+            for (var matcher : matchers.entrySet()) {
+                if (matcher.getValue() > 11) {
+                    final var newCoord = new Coord(matcher.getKey());
+
+                    var newBeacons = new ArrayList<Coord>();
+                    for (var beacon : scanner.getBeaconsWithRotation(r)) {
+                        newBeacons.add(new Coord(newCoord, beacon));
+                    }
+
+                    baseScanner.beacons.addAll(newBeacons);
+                    return newCoord;
+                }
+
+            }
         }
+
         return null;
     }
+
+    private Coord combineCoord(Coord c1, Coord c2) {
+        return new Coord(c2.x - c1.x, c2.y - c1.y, c2.z - c1.z);
+    }
+
 
     public void runPart2() throws URISyntaxException, IOException {
         final var input = readClassPathResource(inputFile).lines().collect(Collectors.toList());
@@ -191,11 +127,7 @@ public class Day19 extends BaseDay {
     private static class Scanner {
         private int name;
         private Coord coord;
-        private Coord foundCoord;
-        private int rotation;
-        private int relativeTo;
-        private List<Coord> beacons = new ArrayList<>();
-        private List<Coord> copyBeacons = new ArrayList<>();
+        private Set<Coord> beacons = new HashSet<>();
 
         private void addBeacons(Coord coord) {
             beacons.add(coord);
@@ -238,11 +170,6 @@ public class Day19 extends BaseDay {
 
             key = this.x + "," + this.y + "," + this.z;
         }
-    }
-
-    private static Coord translateRotation(Coord coord, int rotation) {
-        var perms = getPermutations(coord);
-        return perms.get(rotation);
     }
 
     private static List<Coord> getPermutations(Coord coord) {
@@ -293,13 +220,5 @@ public class Day19 extends BaseDay {
         perms.add(new Coord(y, x, z));
         perms.add(new Coord(z, x, y));
         perms.add(new Coord(y, z, x));
-    }
-
-    private static class Match {
-        Coord coord;
-        String key;
-        int rotation;
-        int scanner;
-        int relativeTo;
     }
 }
